@@ -28,6 +28,7 @@ import {
   MirroredMedia,
   Networked,
   ObjectMenuTarget,
+  ObjectSpawner,
   Rigidbody,
   MediaLoaderOffset,
   MediaVideo,
@@ -261,7 +262,10 @@ function* loadByMediaType(
         uploadDisplayNames.delete(canonicalUrl);
         uploadDisplayNames.delete(accessibleUrl);
       }
-      mediaEid = yield* loadModel(world, accessibleUrl, contentType, true, false, displayName ?? undefined);
+      // Spawner placeholders load the same model as a preview; suppress auto-play so the
+      // placeholder doesn't loop animation by default before anything is spawned.
+      const isSpawner = hasComponent(world, ObjectSpawner, eid);
+      mediaEid = yield* loadModel(world, accessibleUrl, contentType, true, !isSpawner, displayName ?? undefined);
       break;
     }
     case MediaType.PDF:

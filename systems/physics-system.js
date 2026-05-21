@@ -260,6 +260,17 @@ export class PhysicsSystem {
     }
   }
 
+  updateRigidBodyOptions(eid, options) {
+    const bodyId = Rigidbody.bodyId[eid];
+    updateBodyParams(eid, options);
+    const bodyData = this.bodyUuidToData.get(bodyId);
+    if (!bodyData) {
+      console.warn("updateBodyOptions called for invalid bodyId");
+      return;
+    }
+    this.workerHelpers.updateBody(bodyId, Object.assign(bodyData.options, options));
+  }
+
   removeBody(uuid) {
     const bodyData = this.bodyUuidToData.get(uuid);
     if (!bodyData) {

@@ -1,4 +1,4 @@
-import { addComponent, defineQuery, enterQuery, exitQuery, hasComponent } from "bitecs";
+import { addComponent, defineQuery, enterQuery, exitQuery, hasComponent, removeComponent } from "bitecs";
 import { AnimationMixer, Box3, LoopOnce, LoopRepeat, Object3D, Vector3 } from "three";
 import { HubsWorld } from "../app";
 import {
@@ -7,6 +7,8 @@ import {
   Held,
   Holdable,
   Interacted,
+  LoopAnimation,
+  LoopAnimationInitialize,
   MixerAnimatableData,
   NetworkedAnimationOnClick,
   Object3DTag,
@@ -53,6 +55,11 @@ const loopPlaying = new Map<number, boolean>();
 // are ignored — the user is locked into their choice until it finishes.
 const clipName = new Map<number, string>();
 const targetLockUntil = new Map<string, number>();
+
+// Names referenced as indirect-animation targets across all triggers. Used to suppress
+// auto-play (LoopAnimation) on objects that are targets — they should only animate when
+// their trigger is clicked, not loop on scene load.
+const registeredTargets = new Set<string>();
 
 let nafHandlerRegistered = false;
 
@@ -129,6 +136,38 @@ function stopClipsForEntity(
     if (ctx.aframeMixer) {
       ctx.aframeMixer.clipAction(clip, obj).stop();
     }
+  }
+}
+
+// Does `objName` (extension-stripped) match `tName` either exactly or as TargetName_N?
+function targetNameMatches(objName: string, tName: string): boolean {
+  const stripExt = (s: string) => s.replace(/\.(glb|gltf|fbx|obj)$/i, "");
+  const cleanName = stripExt(objName);
+  const cleanT = stripExt(tName);
+  if (cleanName === cleanT) return true;
+  const suffixPattern = new RegExp(`^${cleanT.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}_\\d+$`);
+  return suffixPattern.test(cleanName);
+}
+
+// Walk up from `obj` and remove LoopAnimation (or its Initialize variant) from the first
+// ancestor entity that carries it. Removing LoopAnimation triggers loopAnimationSystem's
+// exit query, which stops the cached actions properly — avoiding the clipAction(clip, obj)
+// vs clipAction(clip, root) action-mismatch that plagues direct mixer.stop() calls here.
+function suppressLoopAnimationOnTarget(world: HubsWorld, obj: Object3D) {
+  let current: Object3D | null = obj;
+  while (current) {
+    const eid = (current as any).eid as number | undefined;
+    if (eid !== undefined) {
+      if (hasComponent(world, LoopAnimationInitialize, eid)) {
+        removeComponent(world, LoopAnimationInitialize, eid);
+        return;
+      }
+      if (hasComponent(world, LoopAnimation, eid)) {
+        removeComponent(world, LoopAnimation, eid);
+        return;
+      }
+    }
+    current = current.parent;
   }
 }
 
@@ -261,7 +300,8 @@ function playAnimations(eid: number) {
     return;
   }
 
-  playClips(mixer, root, uuids, false, cName);
+  // cName selects a clip on the target object, not on the source — don't filter source clips by it.
+  playClips(mixer, root, uuids, false, null);
 
   // Also play linked target animations if configured
   playTargetAnimations(eid);
@@ -365,6 +405,18 @@ export function animationPlaySystem(world: HubsWorld) {
     if (hasComponent(world, ObjectSpawner, eid)) return;
     // Strip common file extensions before checking for the animation tag
     const objName = obj.name.replace(/\.(glb|gltf|fbx|obj)$/i, "");
+
+    // If this newly-entered object is a target of any already-registered trigger,
+    // suppress its auto-play so it only animates when the trigger fires.
+    if (objName) {
+      for (const tName of registeredTargets) {
+        if (targetNameMatches(objName, tName)) {
+          suppressLoopAnimationOnTarget(world, obj);
+          break;
+        }
+      }
+    }
+
     if (!objName.includes(ANIMATION_NAME_TAG)) return;
 
     // Parse mode and target from the suffix
@@ -398,6 +450,10 @@ export function animationPlaySystem(world: HubsWorld) {
 
     if (target) {
       targetName.set(eid, target);
+      // Register so future loads can suppress, and retroactively suppress any matching
+      // objects already in the scene (target may have loaded before this trigger).
+      registeredTargets.add(target);
+      findSceneObjectsByTargetName(target).forEach(m => suppressLoopAnimationOnTarget(world, m));
     }
 
     // Set up bounding box for hand modes
