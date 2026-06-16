@@ -20,7 +20,7 @@ const loopAnimationExitQuery = exitQuery(loopAnimationQuery);
 // Question: Who should have AnimationMixer?
 //           MixerAnimatable component or Scene/App?
 
-const getActiveClips = (
+export const getActiveClips = (
   animations: Array<AnimationClip>,
   activeClipIndices: number[],
   clip: string

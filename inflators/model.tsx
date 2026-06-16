@@ -11,6 +11,15 @@ function camelCase(s: string) {
   return s.replace(/-(\w)/g, (_, m) => m.toUpperCase());
 }
 
+// Objects whose name marks them as interactive/proximity animation triggers. Their clips are
+// played on demand by the trigger systems, so they must not be auto-played (looped) on load.
+const TRIGGER_NAME_PATTERNS = [/_interactive_animation/, /_proximity_(near|medium|far)/];
+function isTriggerName(name?: string): boolean {
+  if (!name) return false;
+  const stripped = name.replace(/\.(glb|gltf|fbx|obj)$/i, "");
+  return TRIGGER_NAME_PATTERNS.some(p => p.test(stripped));
+}
+
 export type ModelParams = { model: Object3D; autoPlayAnimations?: boolean };
 
 // These components are all handled in some special way, not through inflators
@@ -122,6 +131,17 @@ export function inflateModel(world: HubsWorld, rootEid: number, { model, autoPla
   // These components are special because we want to do a one-off action
   // that we can't do in a regular inflator (because they depend on the object3D).
   // If more things need to run at this point, we may need to expand the api here.
+  // Collect the subtrees of any trigger-named objects so their loop-animation clips can be
+  // excluded from auto-play below — the interactive/proximity systems drive those instead.
+  const triggerNamedUuids = new Set<string>();
+  const dbgTriggerNames: string[] = [];
+  model.traverse(obj => {
+    if (isTriggerName(obj.name)) {
+      dbgTriggerNames.push(obj.name);
+      obj.traverse(child => triggerNamedUuids.add(child.uuid));
+    }
+  });
+  const modelHasTriggers = triggerNamedUuids.size > 0;
   const loopAnimationParams: LoopAnimationParams = [];
   model.traverse(obj => {
     const components = obj.userData.gltfExtensions?.MOZ_hubs_components || {};
@@ -138,8 +158,14 @@ export function inflateModel(world: HubsWorld, rootEid: number, { model, autoPla
       });
     }
 
+    // Skip loop-animation on trigger-named objects so they don't auto-loop on load.
     if (components["loop-animation"]) {
-      loopAnimationParams.push(components["loop-animation"]);
+      const excluded = triggerNamedUuids.has(obj.uuid);
+      console.warn(
+        `[anim-debug] (model) "${model.name}" loop-animation on "${obj.name}" excluded=${excluded}`,
+        components["loop-animation"]
+      );
+      if (!excluded) loopAnimationParams.push(components["loop-animation"]);
     }
 
     // We have had both spellings at different times.
@@ -163,7 +189,12 @@ export function inflateModel(world: HubsWorld, rootEid: number, { model, autoPla
   // See https://github.com/Hubs-Foundation/hubs/pull/5938#discussion_r1163410185
   if (model.animations !== undefined && model.animations.length > 0) {
     addComponent(world, MixerAnimatableInitialize, rootEid);
-    if (autoPlayAnimations) {
+    // When the model contains trigger-named objects, only auto-play if non-trigger
+    // loop-animation clips remain, and never fall back to the default (clip 0) — that clip
+    // could belong to a trigger. Models without triggers keep the original behaviour
+    // (including the clip-0 default when no loop-animation components are present).
+    const willAutoPlay = autoPlayAnimations && (!modelHasTriggers || loopAnimationParams.length > 0);
+    if (willAutoPlay) {
       inflateLoopAnimationInitialize(world, rootEid, loopAnimationParams);
     }
   }

@@ -1,23 +1,17 @@
 /** @jsx createElementEntity */
-import { Object3D } from "three";
 import { createElementEntity } from "../utils/jsx-entity";
 import { HubsWorld } from "../app";
 import { loadModel as loadGLTFModel } from "../components/gltf-model-plus";
 import { renderAsEntity } from "../utils/jsx-entity";
 
-const TRIGGER_NAME_PATTERNS = [/_interactive_animation/, /_proximity_(near|medium|far)/];
-
-function hasTriggerNamedDescendant(root: Object3D): boolean {
-  let found = false;
-  root.traverse(child => {
-    if (found || !child.name) return;
-    const stripped = child.name.replace(/\.(glb|gltf|fbx|obj)$/i, "");
-    if (TRIGGER_NAME_PATTERNS.some(p => p.test(stripped))) found = true;
-  });
-  return found;
-}
-
-export function* loadModel(world: HubsWorld, src: string, contentType: string, useCache: boolean, autoPlayAnimations = true, displayName?: string) {
+export function* loadModel(
+  world: HubsWorld,
+  src: string,
+  contentType: string,
+  useCache: boolean,
+  autoPlayAnimations = true,
+  displayName?: string
+) {
   // TODO: Write loadGLTFModelCancelable
   const { scene, animations } = yield loadGLTFModel(src, contentType, useCache, null);
 
@@ -32,9 +26,9 @@ export function* loadModel(world: HubsWorld, src: string, contentType: string, u
     }
   }
 
-  // Suppress auto-play if the model contains any trigger-named objects — those animations
-  // are meant to be controlled by the trigger systems (interactive / proximity), not looped on load.
-  const effectiveAutoPlay = autoPlayAnimations && !hasTriggerNamedDescendant(scene);
+  // Auto-play suppression for trigger-named objects is handled per-object in inflateModel,
+  // so the whole model is no longer gated here. A model that contains interactive/proximity
+  // trigger objects still auto-plays its genuine loop-animation objects (e.g. spaceships.glb).
 
-  return renderAsEntity(world, <entity model={{ model: scene, autoPlayAnimations: effectiveAutoPlay }} objectMenuTarget />);
+  return renderAsEntity(world, <entity model={{ model: scene, autoPlayAnimations }} objectMenuTarget />);
 }

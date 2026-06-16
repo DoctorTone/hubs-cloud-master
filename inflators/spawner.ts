@@ -23,11 +23,9 @@ export interface SpawnerParams {
 export function inflateSpawner(world: HubsWorld, eid: number, props: SpawnerParams) {
   inflateMediaLoader(world, eid, {
     src: props.src,
-    recenter: false,
     resize: false,
     animateLoad: false,
-    isObjectMenuTarget: false,
-    moveParentNotObject: true
+    isObjectMenuTarget: false
   });
 
   addComponent(world, HandCollisionTarget, eid);
@@ -42,6 +40,7 @@ export function inflateSpawner(world: HubsWorld, eid: number, props: SpawnerPara
 
   inflateRigidBody(world, eid, {
     mass: 0,
+    type: Type.STATIC,
     collisionGroup: COLLISION_LAYERS.INTERACTABLES,
     collisionMask: COLLISION_LAYERS.DEFAULT_SPAWNER
   });
