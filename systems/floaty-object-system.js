@@ -18,6 +18,8 @@ import {
   Constraint,
   NetworkedFloatyObject
 } from "../bit-components";
+import { Vector3 } from "three";
+import { setMatrixWorld } from "../utils/three-utils";
 
 export const MakeStaticWhenAtRest = defineComponent();
 
@@ -58,6 +60,12 @@ function makeKinematicOnRelease(world) {
     physicsSystem.updateRigidBodyOptions(eid, { type: "kinematic" });
   });
 }
+// Release speed (m/s) at or above which a release counts as a throw rather than a placement.
+// Below it the object gets heavy damping and settles where it was let go; at or above it the
+// object keeps its momentum and floats away under the reduced release gravity.
+// Measured in VR: a deliberate gentle placement reads ~0.6, the hardest achievable throw ~1.6,
+// so this sits between the two. Raise it if placements start flying, lower it if throws stick.
+const THROW_VELOCITY_THRESHOLD = 1.0;
 
 export const FLOATY_OBJECT_FLAGS = {
   MODIFY_GRAVITY_ON_RELEASE: 1 << 0,
@@ -65,6 +73,55 @@ export const FLOATY_OBJECT_FLAGS = {
   UNTHROWABLE: 1 << 2,
   HELIUM_WHEN_LARGE: 1 << 3
 };
+// --- Floor fall-through safety net -------------------------------------------------
+// Objects (mainly in VR, where release/throw velocities are far higher than a desktop
+// drop) occasionally tunnel through a thin floor collider before physics can resolve the
+// collision. This is a band-aid: we remember where each object was dropped and, if it
+// later ends up well below that point, snap it back and pin it so it stops falling. It
+// does not fix the underlying tunneling — it just prevents objects from being lost.
+const FALL_THROUGH_LIMIT = 6; // metres below the drop height before we treat it as "fell through the floor"
+const dropMatrices = new Map();
+const _recoverPos = new Vector3();
+
+function recordDropPose(world, eid) {
+  const obj = world.eid2obj.get(eid);
+  if (!obj) return;
+  obj.updateMatrices();
+  dropMatrices.set(eid, obj.matrixWorld.clone());
+}
+
+function recoverFallenObjects(world, physicsSystem) {
+  dropMatrices.forEach((dropMatrix, eid) => {
+    if (!entityExists(world, eid) || !hasComponent(world, Owned, eid) || !hasComponent(world, Rigidbody, eid)) {
+      dropMatrices.delete(eid);
+      return;
+    }
+
+    const bodyId = Rigidbody.bodyId[eid];
+    const bodyData = physicsSystem.bodyUuidToData.get(bodyId);
+    // Only dynamic bodies fall. Once something is held/kinematic/at-rest there is nothing
+    // to recover, so stop watching it.
+    if (!bodyData || bodyData.options.type !== "dynamic") {
+      dropMatrices.delete(eid);
+      return;
+    }
+
+    const obj = world.eid2obj.get(eid);
+    obj.updateMatrices();
+    _recoverPos.setFromMatrixPosition(obj.matrixWorld);
+    const dropY = dropMatrix.elements[13];
+    if (_recoverPos.y < dropY - FALL_THROUGH_LIMIT) {
+      // Almost certainly tunneled through the floor. Snap it back to where it was dropped
+      // and pin it (kinematic) — the same state makeStaticAtRest uses — so it stops falling
+      // and can simply be grabbed again.
+      setMatrixWorld(obj, dropMatrix);
+      physicsSystem.updateRigidBodyOptions(eid, { type: "kinematic" });
+      dropMatrices.delete(eid);
+      console.warn(`[floor-recovery] Object eid=${eid} fell below its drop point; snapped back and pinned.`);
+    }
+  });
+}
+// -----------------------------------------------------------------------------------
 
 const enteredFloatyObjectsQuery = enterQuery(defineQuery([FloatyObject, Rigidbody]));
 const heldFloatyObjectsQuery = defineQuery([FloatyObject, Rigidbody, Constraint]);
@@ -95,11 +152,18 @@ export const floatyObjectSystem = world => {
     if (!entityExists(world, eid) || !(hasComponent(world, FloatyObject, eid) && hasComponent(world, Rigidbody, eid)))
       return;
 
+    // Remember where it was released so the fall-through safety net can snap it back.
+    recordDropPose(world, eid);
     const bodyId = Rigidbody.bodyId[eid];
     const bodyData = physicsSystem.bodyUuidToData.get(bodyId);
+
     if (FloatyObject.flags[eid] & FLOATY_OBJECT_FLAGS.MODIFY_GRAVITY_ON_RELEASE) {
-      if (bodyData.linearVelocity < 1.85) {
+      if (bodyData.linearVelocity < THROW_VELOCITY_THRESHOLD) {
         physicsSystem.updateRigidBodyOptions(eid, {
+          // Explicitly restore the dynamic type: the cached body options can still carry the
+          // "static" default from the bitECS Rigidbody store, and a static body ignores
+          // gravity entirely, so the object just freezes wherever it was released.
+          type: "dynamic",
           gravity: { x: 0, y: 0, z: 0 },
           angularDamping: FloatyObject.flags[eid] & FLOATY_OBJECT_FLAGS.REDUCE_ANGULAR_FLOAT ? 0.89 : 0.5,
           linearDamping: 0.95,
@@ -110,6 +174,8 @@ export const floatyObjectSystem = world => {
         addComponent(world, MakeStaticWhenAtRest, eid);
       } else {
         physicsSystem.updateRigidBodyOptions(eid, {
+          // See above — without this the thrown object stays static and never flies.
+          type: "dynamic",
           gravity: { x: 0, y: FloatyObject.releaseGravity[eid], z: 0 },
           angularDamping: 0.01,
           linearDamping: 0.01,
@@ -117,6 +183,9 @@ export const floatyObjectSystem = world => {
           angularSleepingThreshold: 2.5,
           collisionFilterMask: COLLISION_LAYERS.DEFAULT_INTERACTABLE
         });
+        // A body that was static has no activation state to speak of, so make sure it is
+        // awake — otherwise the new gravity would not be applied and it would hang in place.
+        physicsSystem.activateBody(bodyId);
         removeComponent(world, MakeStaticWhenAtRest, eid);
       }
     } else if (FloatyObject.flags[eid] & FLOATY_OBJECT_FLAGS.HELIUM_WHEN_LARGE) {
@@ -171,4 +240,5 @@ export const floatyObjectSystem = world => {
 
   makeStaticAtRest(world);
   makeKinematicOnRelease(world);
+  recoverFallenObjects(world, physicsSystem);
 };

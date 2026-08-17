@@ -913,6 +913,24 @@ export const viveUserBindings = addSetsToBindings({
     }
   ],
 
+  [sets.rightCursorHoveringOnHoldableUI]: [
+    {
+      src: { value: rightTriggerPressed2 },
+      dest: { value: paths.actions.cursor.right.grab },
+      xform: xforms.rising,
+      priority: 1
+    }
+  ],
+
+  [sets.leftCursorHoveringOnHoldableUI]: [
+    {
+      src: { value: leftTriggerPressed2 },
+      dest: { value: paths.actions.cursor.left.grab },
+      xform: xforms.rising,
+      priority: 1
+    }
+  ],
+
   [sets.rightCursorHoveringOnVideo]: [
     {
       src: {

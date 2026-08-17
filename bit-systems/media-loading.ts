@@ -140,6 +140,23 @@ function resizeAndRecenter(world: HubsWorld, mediaLoaderEid: EntityID, box: Box3
     tmpMat.compose(transformPosition, rootRotation, rootScale);
     setMatrixWorld(mediaLoaderObj, tmpMat);
     setMatrixWorld(offsetObj, origMat);
+  } else {
+    // Neither recenter/resize nor move-parent ran, but media frames (and anything
+    // else reading MediaContentBounds) still need a valid content AABB. Without this
+    // the shared `box` stays empty and Box3.getSize() returns [0,0,0], which makes
+    // media-frame scaleForAspectFit blow up to Infinity. Measure with rotation and
+    // scale normalized to identity (same convention as the recenter branch), then
+    // restore the original transform so nothing moves visually.
+    mediaLoaderObj.updateMatrices();
+    origMat.copy(mediaLoaderObj.matrixWorld);
+    tmpMat.copy(origMat);
+    tmpMat.decompose(rootPosition, rootRotation, rootScale);
+    tmpMat.compose(rootPosition, rootRotation.identity(), new Vector3(1, 1, 1));
+    setMatrixWorld(mediaLoaderObj, tmpMat);
+
+    computeObjectAABB(mediaLoaderObj, box, true);
+    setMatrixWorld(mediaLoaderObj, origMat);
+    if (box.isEmpty()) return;
   }
 
   addComponent(world, MediaContentBounds, mediaLoaderEid);

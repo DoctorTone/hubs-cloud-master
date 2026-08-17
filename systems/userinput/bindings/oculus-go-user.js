@@ -196,6 +196,7 @@ export default function generate3DOFTriggerBindings(device) {
 
     [sets.rightCursorHoveringOnInteractable]: [grabBinding],
     [sets.rightCursorHoveringOnUI]: [grabBinding],
+    [sets.rightCursorHoveringOnHoldableUI]: [grabBinding],
     [sets.rightCursorHoldingUI]: [dropBinding],
     [sets.rightCursorHoveringOnVideo]: [
       {

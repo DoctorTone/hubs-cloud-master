@@ -605,6 +605,8 @@ export function animationPlaySystem(world: HubsWorld) {
     }
   });
 
+  const inVR = APP.scene?.is("vr-mode");
+
   // Grabbable triggers (e.g. dragged-in models): record start time + position when held,
   // then on release decide whether the gesture was a click (animate) or a drag (skip).
   heldAnimEnterQuery(world).forEach(eid => {
@@ -625,6 +627,12 @@ export function animationPlaySystem(world: HubsWorld) {
     const obj = world.eid2obj.get(eid);
     if (!obj) return;
 
+    // In VR the buttons are already separate: the trigger fires the animation via the
+    // Interacted path above, and the grip is a pure pickup. Running the click-vs-drag
+    // heuristic there too would make a quick grip-tap both lift the object and animate it.
+    // On desktop one button does both, so the heuristic is still how a click is detected.
+    if (inVR) return;
+
     obj.getWorldPosition(tmpPos);
     const duration = world.time.elapsed - startTime;
     const distance = startPos.distanceTo(tmpPos);
@@ -638,7 +646,6 @@ export function animationPlaySystem(world: HubsWorld) {
   });
 
   // VR hand collision check — only when in VR mode
-  const inVR = APP.scene?.is("vr-mode");
   if (inVR) {
     networkedAnimQuery(world).forEach(eid => {
       const mode = triggerMode.get(eid);

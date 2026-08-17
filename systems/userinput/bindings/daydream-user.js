@@ -139,6 +139,7 @@ export const daydreamUserBindings = addSetsToBindings({
 
   [sets.rightCursorHoveringOnInteractable]: grabBinding,
   [sets.rightCursorHoveringOnUI]: grabBinding,
+  [sets.rightCursorHoveringOnHoldableUI]: grabBinding,
 
   [sets.rightCursorHoveringOnVideo]: [
     {

@@ -1,11 +1,13 @@
 import { addComponent, defineQuery, hasComponent, removeComponent } from "bitecs";
 import {
+  Holdable,
   HoverButton,
   HoveredHandLeft,
   HoveredHandRight,
   HoveredRemoteLeft,
   HoveredRemoteRight,
   Interacted,
+  ObjectSpawner,
   SingleActionButton,
   TextButton
 } from "../bit-components";
@@ -14,20 +16,41 @@ import { hasAnyComponent } from "../utils/bit-utils";
 import { getThemeColor, onThemeChanged } from "../utils/theme";
 import { CAMERA_MODE_INSPECT } from "./camera-system";
 import { paths } from "./userinput/paths";
+// Which input a clickable listens to depends on what else it is. In VR the trigger emits
+// `interact` and the grip emits `grab`; on desktop and touch a single button emits both.
+//
+// - ObjectSpawner: `grab` only. Spawning hands you the copy, so it counts as picking
+//   something up and belongs on the grip. The trigger deliberately does nothing.
+// - Holdable, in VR only: `interact` only. These are clickable *and* grabbable (e.g. objects
+//   tagged _interactive_animation), so listening to `grab` would fire them on the very press
+//   that lifts them. Outside VR one button has to do both jobs, and some Holdables can never
+//   actually be held (Spoke wall buttons fail the canMove check in hold-system), so they
+//   would become unclickable if `grab` stopped counting.
+// - anything else: either, so bindings that only emit `grab` (desktop, touch, and the
+//   headsets whose binding files predate `interact`) keep working unchanged.
+function firedFor(world, eid, interacted, grabbed, inVR) {
+  if (hasComponent(world, ObjectSpawner, eid)) return grabbed;
+  if (inVR && hasComponent(world, Holdable, eid)) return interacted;
+  return interacted || grabbed;
+}
+function interact(world, entities, interactPath, grabPath, interactor) {
+  const userinput = AFRAME.scenes[0].systems.userinput;
+  const interacted = userinput.get(interactPath);
+  const grabbed = userinput.get(grabPath);
+  if (!interacted && !grabbed) return;
 
-function interact(world, entities, path, interactor) {
-  if (AFRAME.scenes[0].systems.userinput.get(path)) {
-    for (let i = 0; i < entities.length; i++) {
-      const eid = entities[i];
-      addComponent(world, Interacted, eid);
+  const inVR = AFRAME.scenes[0].is("vr-mode");
+  for (let i = 0; i < entities.length; i++) {
+    const eid = entities[i];
+    if (!firedFor(world, eid, interacted, grabbed, inVR)) continue;
+    addComponent(world, Interacted, eid);
 
-      // TODO: New systems should not listen for this event
-      // Delete this when we're done interoping with old world systems
-      world.eid2obj.get(eid).dispatchEvent({
-        type: "interact",
-        object3D: interactor
-      });
-    }
+    // TODO: New systems should not listen for this event
+    // Delete this when we're done interoping with old world systems
+    world.eid2obj.get(eid).dispatchEvent({
+      type: "interact",
+      object3D: interactor
+    });
   }
 }
 
@@ -53,12 +76,14 @@ function singleActionButtonSystem(world) {
   interact(
     world,
     leftRemoteQuery(world),
+    paths.actions.cursor.left.interact,
     paths.actions.cursor.left.grab,
     interactorSettings.leftRemote.entity.object3D
   );
   interact(
     world,
     rightRemoteQuery(world),
+    paths.actions.cursor.right.interact,
     paths.actions.cursor.right.grab,
     interactorSettings.rightRemote.entity.object3D
   );

@@ -116,15 +116,13 @@ export function resolveActionSets() {
   userinput.toggleSet(sets.rightHandHoldingCamera, hc(world, CameraTool, rightHandHolding));
   userinput.toggleSet(sets.leftCursorHoldingCamera, hc(world, CameraTool, leftRemoteHolding));
   userinput.toggleSet(sets.rightCursorHoldingCamera, hc(world, CameraTool, rightRemoteHolding));
-
-  userinput.toggleSet(
-    sets.leftCursorHoveringOnUI,
-    hc(world, SingleActionButton, leftRemoteHovering) || hc(world, HoldableButton, leftRemoteHovering)
-  );
-  userinput.toggleSet(
-    sets.rightCursorHoveringOnUI,
-    hc(world, SingleActionButton, rightRemoteHovering) || hc(world, HoldableButton, rightRemoteHovering)
-  );
+  // Split by button kind, because the two need different buttons in VR. A SingleActionButton
+  // is clicked (trigger -> interact); a HoldableButton is grabbed and dragged, e.g. the object
+  // menu's rotate/scale handles, so it still needs the trigger to emit grab.
+  userinput.toggleSet(sets.leftCursorHoveringOnUI, hc(world, SingleActionButton, leftRemoteHovering));
+  userinput.toggleSet(sets.rightCursorHoveringOnUI, hc(world, SingleActionButton, rightRemoteHovering));
+  userinput.toggleSet(sets.leftCursorHoveringOnHoldableUI, hc(world, HoldableButton, leftRemoteHovering));
+  userinput.toggleSet(sets.rightCursorHoveringOnHoldableUI, hc(world, HoldableButton, rightRemoteHovering));
 
   userinput.toggleSet(sets.leftCursorHoldingNothing, !leftRemoteHolding);
   userinput.toggleSet(sets.rightCursorHoldingNothing, !rightRemoteHolding);

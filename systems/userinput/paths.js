@@ -46,6 +46,9 @@ paths.actions.cursor.right = {};
 paths.actions.cursor.right.pose = "/actions/cursor/right/Pose";
 paths.actions.cursor.right.hideLine = "/actions/cursor/right/HideLine";
 paths.actions.cursor.right.grab = "/actions/cursor/right/Grab";
+// "Select/click" as distinct from "pick up". In VR these are separate buttons (trigger vs
+// grip); on desktop and touch a single button emits both. See single-action-button-system.
+paths.actions.cursor.right.interact = "/actions/cursor/right/Interact";
 paths.actions.cursor.right.drop = "/actions/cursor/right/Drop";
 paths.actions.cursor.right.modDelta = "/actions/cursor/right/ModDelta";
 paths.actions.cursor.right.startDrawing = "/actions/cursor/right/StartDrawing";
@@ -64,6 +67,7 @@ paths.actions.cursor.left = {};
 paths.actions.cursor.left.pose = "/actions/cursor/left/Pose";
 paths.actions.cursor.left.hideLine = "/actions/cursor/left/HideLine";
 paths.actions.cursor.left.grab = "/actions/cursor/left/Grab";
+paths.actions.cursor.left.interact = "/actions/cursor/left/Interact";
 paths.actions.cursor.left.drop = "/actions/cursor/left/Drop";
 paths.actions.cursor.left.modDelta = "/actions/cursor/left/ModDelta";
 paths.actions.cursor.left.startDrawing = "/actions/cursor/left/StartDrawing";

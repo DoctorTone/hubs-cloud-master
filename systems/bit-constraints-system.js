@@ -47,6 +47,15 @@ function add(world, physicsSystem, interactor, constraintComponent, entities) {
   for (let i = 0; i < entities.length; i++) {
     const eid = findAncestorEntity(world, entities[i], ancestor => hasComponent(world, Rigidbody, ancestor));
     if (!entityExists(world, eid)) continue;
+
+    // A static body is scene geometry and is never grabbable. This matters because the lookup
+    // above walks up to the nearest Rigidbody *ancestor*: an interactive Spoke object has no
+    // body of its own, so it resolves to #environment-root (hub.html), which carries the scene's
+    // trimesh floor collider. Making that dynamic breaks the floor for everything — Bullet
+    // cannot simulate a concave btBvhTriangleMeshShape as a dynamic body, so it stops generating
+    // contacts and every object dropped afterwards falls straight through.
+    const bodyData = physicsSystem.bodyUuidToData.get(Rigidbody.bodyId[eid]);
+    if (bodyData && bodyData.options.type === "static") continue;
     physicsSystem.updateRigidBody(eid, grabBodyOptions);
     physicsSystem.addConstraint(interactor, Rigidbody.bodyId[eid], Rigidbody.bodyId[interactor], {});
     addComponent(world, Constraint, eid);
@@ -114,7 +123,7 @@ export function constraintsSystem(world, physicsSystem) {
   remove(
     world,
     OffersHandConstraint,
-    ConstraintHandRight,
+    ConstraintHandLeft,
     physicsSystem,
     anyEntityWith(world, HandLeft),
     queryExitHandLeft(world)

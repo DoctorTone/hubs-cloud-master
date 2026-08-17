@@ -749,6 +749,26 @@ export const oculusTouchUserBindings = addSetsToBindings({
   [sets.leftCursorHoveringOnUI]: [
     {
       src: { value: leftTriggerPressed2 },
+      dest: { value: paths.actions.cursor.left.interact },
+      xform: xforms.rising,
+      priority: 2
+    }
+  ],
+
+  // Holdable UI (object menu rotate/scale handles) is dragged rather than clicked, so the
+  // trigger still emits grab here. Dropping stays on the CursorHoldingUI sets below.
+  [sets.rightCursorHoveringOnHoldableUI]: [
+    {
+      src: { value: rightTriggerPressed2 },
+      dest: { value: paths.actions.cursor.right.grab },
+      xform: xforms.rising,
+      priority: 2
+    }
+  ],
+
+  [sets.leftCursorHoveringOnHoldableUI]: [
+    {
+      src: { value: leftTriggerPressed2 },
       dest: { value: paths.actions.cursor.left.grab },
       xform: xforms.rising,
       priority: 2
@@ -901,6 +921,14 @@ export const oculusTouchUserBindings = addSetsToBindings({
       xform: xforms.any,
       priority: 2
     },
+    // Grabbable objects that are also clickable (e.g. _interactive_animation) are clicked
+    // with the trigger and lifted with the grip.
+    {
+      src: [rightTriggerRisingGrab],
+      dest: { value: paths.actions.cursor.right.interact },
+      xform: xforms.any,
+      priority: 2
+    },
     {
       src: { value: upperButtons },
       dest: { value: paths.actions.startInspecting },
@@ -924,6 +952,12 @@ export const oculusTouchUserBindings = addSetsToBindings({
     {
       src: [leftGripRisingGrab],
       dest: { value: paths.actions.cursor.left.grab },
+      xform: xforms.any,
+      priority: 2
+    },
+    {
+      src: [leftTriggerRisingGrab],
+      dest: { value: paths.actions.cursor.left.interact },
       xform: xforms.any,
       priority: 2
     },

@@ -596,6 +596,14 @@ export const wmrUserBindings = addSetsToBindings({
     }
   ],
 
+  [sets.rightCursorHoveringOnHoldableUI]: [
+    {
+      src: { value: rTriggerPressed },
+      dest: { value: paths.actions.cursor.right.grab },
+      xform: xforms.rising
+    }
+  ],
+
   [sets.rightCursorHoveringOnVideo]: [...cursorMediaVolumeModBindings()],
 
   [sets.leftHandHoveringOnInteractable]: [

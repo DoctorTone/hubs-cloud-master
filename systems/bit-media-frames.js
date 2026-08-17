@@ -19,6 +19,7 @@ import {
   MediaContentBounds,
   MediaFrame,
   MediaImage,
+  MediaLoaded,
   MediaPDF,
   MediaVideo,
   Networked,
@@ -102,6 +103,13 @@ function inOtherFrame(world, ignoredFrame, eid) {
   return false;
 }
 
+// True when the content bounds collapse on every axis (an empty/unmeasured box).
+// Such bounds would make scaleForAspectFit return Infinity, so we don't capture them.
+function isDegenerateBounds(bounds) {
+  const EPS = 1e-6;
+  return Math.abs(bounds[0]) < EPS && Math.abs(bounds[1]) < EPS && Math.abs(bounds[2]) < EPS;
+}
+
 function getCapturableEntity(world, physicsSystem, frame) {
   const collisions = physicsSystem.getCollisions(Rigidbody.bodyId[frame]);
   const frameObj = world.eid2obj.get(frame);
@@ -111,6 +119,10 @@ function getCapturableEntity(world, physicsSystem, frame) {
     if (
       MediaFrame.mediaType[frame] & mediaTypeMaskFor(world, eid) &&
       hasComponent(world, MediaContentBounds, eid) &&
+      // Guard against fully-degenerate bounds (all axes ~0), which would make
+      // scaleForAspectFit blow up to Infinity when snapping. A single flat axis
+      // (e.g. images/PDFs with z~0) is fine — min() ignores that axis' Infinity.
+      !isDegenerateBounds(MediaContentBounds.bounds[eid]) &&
       !inOtherFrame(world, frame, eid) &&
       !isAncestor(bodyData.object3D, frameObj)
     ) {

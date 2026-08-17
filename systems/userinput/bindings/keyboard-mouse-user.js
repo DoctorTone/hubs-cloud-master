@@ -895,6 +895,13 @@ export const keyboardMouseUserBindings = addSetsToBindings({
       xform: xforms.rising
     }
   ],
+  [sets.rightCursorHoveringOnHoldableUI]: [
+    {
+      src: { value: paths.device.mouse.buttonLeft },
+      dest: { value: paths.actions.cursor.right.grab },
+      xform: xforms.rising
+    }
+  ],
   [sets.inspecting]: [
     {
       src: { value: paths.device.keyboard.key("space") },

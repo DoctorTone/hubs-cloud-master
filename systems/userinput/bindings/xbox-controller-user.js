@@ -226,6 +226,13 @@ export const xboxControllerUserBindings = addSetsToBindings({
       xform: xforms.rising
     }
   ],
+  [sets.rightCursorHoveringOnHoldableUI]: [
+    {
+      src: { value: button("rightTrigger").pressed },
+      dest: { value: paths.actions.cursor.right.grab },
+      xform: xforms.rising
+    }
+  ],
   [sets.rightCursorHoveringOnInteractable]: [
     ...characterAccelerationBindings(),
     {
