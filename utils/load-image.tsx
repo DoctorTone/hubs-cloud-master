@@ -58,6 +58,19 @@ export function* loadImage(world: HubsWorld, eid: EntityID, url: string, content
     imageDef.projection = projection;
   }
 
+  // A 360 image is built as a sphere the viewer stands inside (see inflateImage), so it can
+  // never be usefully grabbed or menued. Making it a cursor target is actively harmful: the
+  // cursor ray hits the surrounding sphere in every direction, so the hovering-an-interactable
+  // action set stays permanently active and starves the mouse-look binding, leaving desktop
+  // users unable to turn the camera at all.
+  //
+  // Omitting grabbable here is not enough on its own: findRemoteHoverTarget walks *up* the
+  // parent chain, so it would just keep climbing to the RemoteHoverTarget on the MediaPrefab
+  // root. isNotRemoteHoverTarget is checked before that climb, so it short-circuits the whole
+  // ancestry regardless of which prefab wrapped this image.
+  if (imageDef.projection === ProjectionMode.SPHERE_EQUIRECTANGULAR) {
+    return renderAsEntity(world, <entity name="Image" image={imageDef} />);
+  }
   ObjectMenuTarget.flags[eid] |= ObjectMenuTargetFlags.Flat;
 
   return renderAsEntity(

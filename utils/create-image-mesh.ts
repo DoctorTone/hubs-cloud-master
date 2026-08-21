@@ -26,6 +26,8 @@ export function getAlphaModeFromAlphaModeName(alphaMode: AlphaModeName) {
   return AlphaMode.OPAQUE;
 }
 
+const noRaycast = function () {};
+
 export function create360ImageMesh(texture: Texture, alphaMode: AlphaMode = AlphaMode.OPAQUE, alphaCutoff = 0.5) {
   const geometry = new THREE.SphereBufferGeometry(1, 64, 32);
   // invert the geometry on the x-axis so that all of the faces point inward
@@ -65,6 +67,12 @@ export function create360ImageMesh(texture: Texture, alphaMode: AlphaMode = Alph
 
   const mesh = new THREE.Mesh(geometry, material);
   mesh.layers.set(Layers.CAMERA_LAYER_FX_MASK);
+  // This sphere is inside-out background geometry that encloses the viewer, so a cursor ray
+  // hits it in every direction. Letting it be raycastable makes the cursor report an
+  // intersection at all times, which keeps the hovering-an-interactable action set active and
+  // starves the desktop mouse-look binding. It is never a meaningful pointer target, so opt it
+  // out of raycasting entirely.
+  mesh.raycast = noRaycast;
   return mesh;
 }
 
